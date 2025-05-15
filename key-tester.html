@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>OpenAI Key Bug Tester</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 44rem;
+      margin: 2rem auto;
+      line-height: 1.55;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+    input[type="password"] {
+      width: 100%;
+      padding: 0.5rem;
+      font-size: 1rem;
+      box-sizing: border-box;
+      margin-top: 0.25rem;
+    }
+    button {
+      padding: 0.6rem 1.25rem;
+      font-size: 1rem;
+      margin-top: 1rem;
+      cursor: pointer;
+      border: none;
+      border-radius: 0.375rem;
+      background: #0369a1;
+      color: #fff;
+    }
+    button:hover {
+      background: #02567e;
+    }
+    #status {
+      margin-top: 1.5rem;
+      min-height: 3rem;
+    }
+    #output {
+      white-space: pre-wrap;
+      padding: 1rem;
+      background: #f4f4f4;
+      border-radius: 0.375rem;
+      overflow: auto;
+      max-height: 22rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>OpenAI Key Bug Tester</h1>
+  <p>
+    Enter your OpenAI API key below and click <strong>Run Test</strong>. <em>Your key is never
+    stored or sent anywhere except directly to the OpenAI API from your browser – this page
+    performs everything locally.</em>
+  </p>
+
+  <label>
+    OpenAI API Key:
+    <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" />
+  </label>
+  <button id="runBtn">Run Test</button>
+
+  <div id="status"></div>
+  <pre id="output"></pre>
+
+  <script type="module">
+    // The secret phrase contained inside file.pdf – adjust if you change the PDF
+    const expectedPhrase = "consequence woman organization";
+
+    document.getElementById("runBtn").addEventListener("click", runTest);
+
+    async function runTest() {
+      const key = document.getElementById("apiKey").value.trim();
+      if (!key) {
+        alert("Please enter your OpenAI API key first.");
+        return;
+      }
+
+      setStatus("Running test, please wait…");
+
+      try {
+        // 1 – load bundled PDF and convert to Base64
+        const pdfResp = await fetch("file.pdf");
+        if (!pdfResp.ok) throw new Error(`Could not fetch PDF (HTTP ${pdfResp.status})`);
+        const pdfBuffer = await pdfResp.arrayBuffer();
+
+        // Convert the ArrayBuffer → Base64 using btoa on a binary string
+        const binary = String.fromCharCode(...new Uint8Array(pdfBuffer));
+        const pdfBase64 = "data:application/pdf;base64," + btoa(binary);
+
+        // 2 – call the Chat Completions endpoint
+        const body = {
+          model: "gpt-4.1-2025-04-14", // keep in sync with the server‑side script
+          messages: [
+            { role: "system", content: "Respond with the secret phrase contained in the PDF." },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "file",
+                  file: {
+                    file_data: pdfBase64,
+                    filename: "file.pdf",
+                  },
+                },
+              ],
+            },
+          ],
+          temperature: 0,
+          n: 1,
+          seed: 1338,
+        };
+
+        const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + key,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!aiResp.ok) {
+          const errText = await aiResp.text();
+          throw new Error(`OpenAI error ${aiResp.status}: ${errText}`);
+        }
+
+        const data = await aiResp.json();
+        const content = (data.choices?.[0]?.message?.content || "").trim();
+
+        // 3 – display results and verdict
+        document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+
+        if (content.includes(expectedPhrase)) {
+          setStatus(
+            '<span style="color:green; font-size:2rem; font-weight:700;">KEY IS NOT AFFECTED</span>'
+          );
+        } else {
+          setStatus(
+            '<span style="color:red; font-size:2rem; font-weight:700;">KEY IS AFFECTED</span>'
+          );
+        }
+      } catch (err) {
+        setStatus(`<span style="color:red;">${err.message}</span>`);
+      }
+    }
+
+    function setStatus(html) {
+      document.getElementById("status").innerHTML = html;
+    }
+  </script>
+</body>
+</html>
+
