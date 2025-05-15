@@ -3,7 +3,6 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #   "dotenv",
-#   "pypdf",
 #   "openai",
 # ]
 # ///
@@ -11,8 +10,8 @@
 import sys
 import os
 import openai
-import pypdf
 import base64
+import pprint
 
 import dotenv
 
@@ -29,11 +28,7 @@ Repro OpenAI API bug:
 """
 
 
-def create_pdf(expected_phrase: str):
-  pypdf.PdfWriter().add_page()
-
-
-def run_with_pdf_contents(api_key: str, pdf_contents: bytes):
+def run_with_pdf_contents(api_key: str, pdf_contents: bytes, name: str):
   # Encode the PDF as base64
   # https://platform.openai.com/docs/guides/pdf-files?api-mode=chat#base64-encoded-files
   b64_encoded = base64.b64encode(pdf_contents).decode()
@@ -49,20 +44,25 @@ def run_with_pdf_contents(api_key: str, pdf_contents: bytes):
       "content": [
         {
           "type": "file",
-          "file": {"file_data": pdf_base64, "filename": "questionnaire.pdf"},
+          "file": {"file_data": pdf_base64, "filename": "file.pdf"},
         },
       ],
     },
   ]
 
   client = openai.Client(api_key=api_key)
-  completion = await client.chat.completions.create(
+  completion = client.chat.completions.create(
     model="gpt-4.1-2025-04-14",
     messages=messages,
     temperature=0.0,
     n=1,
     seed=1338,
   )
+
+  # Full completion, check for errors:
+  print("*" * 80)
+  print(f"Full completion ({name}):")
+  pprint.pprint(completion.model_dump())
 
   return completion.choices[0].message.content
 
@@ -77,12 +77,18 @@ def main():
     sys.exit(1)
 
   expected_phrase = "consequence woman organization"
-  pdf_contents = create_pdf(expected_phrase)
+  with open("file.pdf", "rb") as f:
+    pdf_contents = f.read()
 
   # Test with the good key
-  good_result = run_with_pdf_contents(good_key, pdf_contents)
-  bad_result = run_with_pdf_contents(bad_key, pdf_contents)
+  good_result = run_with_pdf_contents(good_key, pdf_contents, "good")
+  bad_result = run_with_pdf_contents(bad_key, pdf_contents, "bad")
 
+  print("*" * 80)
   print("Expected phrase:", expected_phrase)
   print("Good key result:", good_result)
   print("Bad key result:", bad_result)
+
+
+if __name__ == "__main__":
+  main()
