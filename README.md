@@ -1,10 +1,13 @@
 # OpenAI Missing File Bug Reproduction
 
+*UPDATE*: This bug also seems to happen with brand new keys!
+
 This repro replicates a bug in the OpenAI API where the model is unable to see
 files when using old API keys.
 
 Given two legacy API keys, one old and one new, the model is able to see files
 when using the new key but not when using the old key.
+
 
 The old key should be 51 characters long and the new key should be ~95 characters
 long.
