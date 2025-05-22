@@ -1,5 +1,9 @@
 # OpenAI Missing File Bug Reproduction
 
+**NOTE** This appears to have been fixed.
+
+---
+
 Test your key with this web tool:
 
 [Key Tester](https://mgraczyk.github.io/openai-api-file-bug-repro/key-tester.html)
